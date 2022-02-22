@@ -37,7 +37,7 @@ app.post('/employees', async (req,res,next) =>{
 
 try{ 
   const employee = await Employee.create(req.body)
-  res.send(employee)
+  res.redirect(`/categories/${employee.categoryId}`)
 
 }
 catch(ex) {
