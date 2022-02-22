@@ -27,11 +27,24 @@ const express = require("express");
 const { urlencoded, response } = require("express");
 const app = express();
 const port = process.env.PORT || 3000;
-app.use(express.urlencoded({extended:false}))
+const methodOverride = require('method-override')
+app.use(express.urlencoded({extended:false}));
+app.use(methodOverride('remove'));
 
 app.get("/", (req, res) => {
   res.redirect("/employees");
 });
+
+app.delete('/employees/:id', async (req,res,next) => {
+try{ const employee= await Employee.findByPk(req.params.id)
+  await employee.destroy(); 
+  res.redirect(`/categories/${employee.categoryId}`)
+}
+catch(ex) {
+  next(ex)
+}
+
+})
 
 app.post('/employees', async (req,res,next) =>{
 
@@ -109,6 +122,7 @@ app.get("/employees/:id", async (req, res, next) => {
 
     const html = `${employees.name} - ${employees.category.name}
       <a href = '/employees'> << back >> </a>
+     
     `
 
       res.send(html)
@@ -120,8 +134,33 @@ app.get("/employees/:id", async (req, res, next) => {
 
 app.get('/categories/:id', async(req,res,next) => {
   try{  
-    const category = await Category.findByPk(req.params.id, { include: [Employee]})
-    res.send(category)
+    const categories = await Category.findByPk(req.params.id, { include: [Employee]})
+    const html = categories.employees.map(employee => {
+      return `
+      <div>
+        ${employee.name}
+        <form method= 'post' action= '/employees/${employee.id}?remove=delete'>
+          <button> delete </button>
+          </form>
+      </div>
+      `
+    }).join('')
+    res.send(`
+    <html>
+    <head>
+      <title> Robbys' Corporation </title>
+    </head>
+    <body>
+      <h1> Robby's Corporation </h1>
+      <h2> ${categories.name} </h2>
+      <div> ${html} </div>
+      <a href = '/employees'> BACK </a>
+     
+    </body>
+</html>
+    
+    
+    `)
   }
   catch(ex){
       next(ex)
