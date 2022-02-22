@@ -1,65 +1,38 @@
-const Sequelize = require("sequelize");
-const sequelize = new Sequelize(
-  process.env.DATABASE_URL || "postgres://localhost/robbys_corporation"
-);
-
-const Category = sequelize.define("category", {
-  name: {
-    type: Sequelize.DataTypes.ENUM("Finance", "Accounting", "HR"),
-    unique: true,
-    allowNull: false,
-  },
-});
-
-const Employee = sequelize.define("employee", {
-  name: {
-    type: Sequelize.DataTypes.STRING,
-    unique: true,
-    allowNull: false,
-  },
-});
-
-Employee.belongsTo(Category);
-Category.hasMany(Employee);
-Employee.belongsTo(Employee, { as: "boss" });
+const db = require("./db");
+const Employee = db.Employee;
+const Category = db.Category;
+const sequelize = db.sequelize;
 
 const express = require("express");
 const { urlencoded, response } = require("express");
 const app = express();
 const port = process.env.PORT || 3000;
-const methodOverride = require('method-override')
-app.use(express.urlencoded({extended:false}));
-app.use(methodOverride('remove'));
+const methodOverride = require("method-override");
+app.use(express.urlencoded({ extended: false }));
+app.use(methodOverride("remove"));
 
 app.get("/", (req, res) => {
   res.redirect("/employees");
 });
 
-app.delete('/employees/:id', async (req,res,next) => {
-try{ const employee= await Employee.findByPk(req.params.id)
-  await employee.destroy(); 
-  res.redirect(`/categories/${employee.categoryId}`)
-}
-catch(ex) {
-  next(ex)
-}
+app.delete("/employees/:id", async (req, res, next) => {
+  try {
+    const employee = await Employee.findByPk(req.params.id);
+    await employee.destroy();
+    res.redirect(`/categories/${employee.categoryId}`);
+  } catch (ex) {
+    next(ex);
+  }
+});
 
-})
-
-app.post('/employees', async (req,res,next) =>{
-
-try{ 
-  const employee = await Employee.create(req.body)
-  res.redirect(`/categories/${employee.categoryId}`)
-
-}
-catch(ex) {
-
-  next(ex)
-}
-
-
-})
+app.post("/employees", async (req, res, next) => {
+  try {
+    const employee = await Employee.create(req.body);
+    res.redirect(`/categories/${employee.categoryId}`);
+  } catch (ex) {
+    next(ex);
+  }
+});
 app.get("/employees", async (req, res, next) => {
   try {
     const employees = await Employee.findAll({
@@ -67,13 +40,15 @@ app.get("/employees", async (req, res, next) => {
     });
 
     const categories = await Category.findAll();
-    const options = categories.map(category=> {
-      return `
+    const options = categories
+      .map((category) => {
+        return `
       <option value='${category.id}'>
       ${category.name}
       </option>
-      `
-    }).join('')
+      `;
+      })
+      .join("");
     const html = employees
       .map((employee) => {
         const boss = employee.boss;
@@ -117,34 +92,37 @@ app.get("/employees", async (req, res, next) => {
 app.get("/employees/:id", async (req, res, next) => {
   try {
     const employees = await Employee.findByPk(req.params.id, {
-      include: [Category]
+      include: [Category],
     });
 
     const html = `${employees.name} - ${employees.category.name}
       <a href = '/employees'> << back >> </a>
      
-    `
+    `;
 
-      res.send(html)
-  } 
-  catch (ex) {
+    res.send(html);
+  } catch (ex) {
     next(ex);
   }
 });
 
-app.get('/categories/:id', async(req,res,next) => {
-  try{  
-    const categories = await Category.findByPk(req.params.id, { include: [Employee]})
-    const html = categories.employees.map(employee => {
-      return `
+app.get("/categories/:id", async (req, res, next) => {
+  try {
+    const categories = await Category.findByPk(req.params.id, {
+      include: [Employee],
+    });
+    const html = categories.employees
+      .map((employee) => {
+        return `
       <div>
         ${employee.name}
         <form method= 'post' action= '/employees/${employee.id}?remove=delete'>
           <button> delete </button>
           </form>
       </div>
-      `
-    }).join('')
+      `;
+      })
+      .join("");
     res.send(`
     <html>
     <head>
@@ -160,12 +138,11 @@ app.get('/categories/:id', async(req,res,next) => {
 </html>
     
     
-    `)
+    `);
+  } catch (ex) {
+    next(ex);
   }
-  catch(ex){
-      next(ex)
-  }
-})
+});
 
 const init = async () => {
   await sequelize.sync({ force: true });
