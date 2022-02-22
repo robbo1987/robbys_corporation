@@ -24,34 +24,78 @@ Category.hasMany(Employee);
 Employee.belongsTo(Employee, { as: "boss" });
 
 const express = require("express");
+const { urlencoded, response } = require("express");
 const app = express();
 const port = process.env.PORT || 3000;
+app.use(express.urlencoded({extended:false}))
 
 app.get("/", (req, res) => {
   res.redirect("/employees");
 });
 
+app.post('/employees', async (req,res,next) =>{
+
+try{ 
+  const employee = await Employee.create(req.body)
+  res.send(employee)
+
+}
+catch(ex) {
+
+  next(ex)
+}
+
+
+})
 app.get("/employees", async (req, res, next) => {
   try {
     const employees = await Employee.findAll({
       include: [Category, { model: Employee, as: "boss" }],
     });
-    console.log(JSON.stringify(employees, null, 2));
+
+    const categories = await Category.findAll();
+    const options = categories.map(category=> {
+      return `
+      <option value='${category.id}'>
+      ${category.name}
+      </option>
+      `
+    }).join('')
     const html = employees
       .map((employee) => {
         const boss = employee.boss;
-        let bossName = "";
+        let bossName = "NO BOSS";
         if (boss) {
           bossName = boss.name;
         }
         return `<div>
-                        ${employee.name} - ${employee.bossId} -${employee.category.name} - ${bossName}
+                        Employee Name: ${employee.name} -- Employee Department: ${employee.category.name} -- Name of Boss: ${bossName}
                         <a href = '/employees/${employee.id}'> employee page </a>
+                        <a href = 'categories/${employee.categoryId}'> category page </a>
                     </div>
               `;
       })
       .join("");
-    res.send(html);
+    res.send(`
+    <html>
+        <head>
+          <title> Robbys' Corporation </title>
+        </head>
+        <body>
+          <h1> Robby's Corporation </h1>
+          <form Method = "POST">
+          <input name='name' placeholder = "employee name">
+          <select name="categoryId">
+          ${options}
+          </select>
+          <button> CREATE NEW EMPLOYEE</button>
+          </form>
+          <div> ${html} </div>
+         
+        </body>
+    </html>
+    
+    `);
   } catch (ex) {
     next(ex);
   }
@@ -59,16 +103,30 @@ app.get("/employees", async (req, res, next) => {
 
 app.get("/employees/:id", async (req, res, next) => {
   try {
-    const employee = await Employee.findByPk(req.params.id, {
+    const employees = await Employee.findByPk(req.params.id, {
       include: [Category]
-    })
+    });
 
-      res.send(employee)
+    const html = `${employees.name} - ${employees.category.name}
+      <a href = '/employees'> << back >> </a>
+    `
+
+      res.send(html)
   } 
   catch (ex) {
     next(ex);
   }
 });
+
+app.get('/categories/:id', async(req,res,next) => {
+  try{  
+    const category = await Category.findByPk(req.params.id, { include: [Employee]})
+    res.send(category)
+  }
+  catch(ex){
+      next(ex)
+  }
+})
 
 const init = async () => {
   await sequelize.sync({ force: true });
